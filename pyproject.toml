@@ -1,0 +1,72 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "brain-tumor-mas-flower"
+version = "0.1.0"
+description = "Multi-agent federated learning for Brain Tumor MRI classification with Flower"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "Apache-2.0"
+dependencies = [
+    "flwr[simulation]>=1.20.0,<2.0.0",
+    "numpy>=1.24",
+    "torch>=2.1.0",
+    "torchvision>=0.16.0",
+    "scikit-learn>=1.3.0",
+    "Pillow>=10.0.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["brain_tumor_fl"]
+
+[tool.flwr.app]
+publisher = "sergo20025"
+
+[tool.flwr.app.components]
+serverapp = "brain_tumor_fl.server_app:app"
+clientapp = "brain_tumor_fl.client_app:app"
+
+[tool.flwr.app.config]
+num-server-rounds = 20
+num-clients = 10
+fraction-fit = 1.0
+fraction-evaluate = 1.0
+min-available-clients = 10
+local-epochs = 2
+batch-size = 16
+learning-rate = 0.0002
+weight-decay = 0.00001
+partition-mode = "dirichlet"
+dirichlet-alpha = 0.5
+dataset-root = "brain_tumor_mri"
+val-split = 0.1
+test-split = 0.15
+num-workers = 0
+random-seed = 42
+use-pretrained = true
+decentralized-mode = true
+save-metrics-path = "outputs/round_metrics.jsonl"
+
+
+#######################################################################
+# CONFIGURATION MIGRATION NOTICE:
+#
+# What was previously called "federation config" for SuperLink
+# connections in pyproject.toml has been renamed and moved.
+#
+# These settings are now **SuperLink connection configuration**
+# and are defined in the Flower configuration file.
+#
+# The entries below are commented out intentionally and are kept
+# only as a migration reference.
+#
+# Docs: https://flower.ai/docs/framework/ref-flower-configuration.html
+#######################################################################
+
+# [tool.flwr.federations]
+# default = "local-simulation"
+
+# [tool.flwr.federations.local-simulation]
+# options.num-supernodes = 10

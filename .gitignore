@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.ipynb_checkpoints/
+.flwr-home/
+.ray-tmp/
+.kaggle/
+brain_tumor_mri/
+outputs/

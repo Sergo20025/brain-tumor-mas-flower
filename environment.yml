@@ -1,0 +1,19 @@
+name: brain-tumor-fl
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - pip>=24
+  - libblas=*=*openblas
+  - numpy>=1.26,<3
+  - pandas>=2.2
+  - scikit-learn>=1.5
+  - pillow>=10
+  - matplotlib>=3.9
+  - seaborn>=0.13
+  - tqdm>=4.66
+  - jupyterlab>=4.2
+  - pip:
+      - kaggle>=2.0
+      - flwr>=1.29,<2.0
+      - ray>=2.54,<3.0
