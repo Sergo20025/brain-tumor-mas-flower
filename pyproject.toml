@@ -29,7 +29,7 @@ serverapp = "brain_tumor_fl.server_app:app"
 clientapp = "brain_tumor_fl.client_app:app"
 
 [tool.flwr.app.config]
-num-server-rounds = 20
+num-server-rounds = 10
 num-clients = 10
 fraction-fit = 1.0
 fraction-evaluate = 1.0

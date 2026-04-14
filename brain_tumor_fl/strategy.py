@@ -5,6 +5,7 @@ from logging import INFO
 from pathlib import Path
 from typing import Any
 
+import torch
 from flwr.common import NDArrays, Parameters, Scalar, ndarrays_to_parameters, parameters_to_ndarrays
 from flwr.common.logger import log
 from flwr.server.strategy import FedAvg
@@ -12,6 +13,7 @@ from flwr.server.strategy import FedAvg
 from brain_tumor_fl.agents.aggregation_agent import AggregationAgent
 from brain_tumor_fl.agents.monitoring_agent import MonitoringAgent
 from brain_tumor_fl.agents.storage_agent import StorageAgent
+from brain_tumor_fl.data import discover_dataset_layout
 from brain_tumor_fl.model import build_model
 from brain_tumor_fl.training import evaluate_model, get_device, get_parameters, set_parameters
 from brain_tumor_fl.utils import coerce_bool
@@ -54,6 +56,11 @@ class TrustAwareFedAvg(FedAvg):
         self.metrics_path = Path(str(run_config["save-metrics-path"]))
         self.metrics_path.parent.mkdir(parents=True, exist_ok=True)
         self.global_metrics_path = self.metrics_path.with_name("global_eval_metrics.jsonl")
+        self.checkpoints_dir = self.metrics_path.parent / "checkpoints"
+        self.checkpoints_dir.mkdir(parents=True, exist_ok=True)
+        self.best_checkpoint_path = self.checkpoints_dir / "best_model.pt"
+        self.latest_checkpoint_path = self.checkpoints_dir / "latest_model.pt"
+        self.best_f1_macro = float("-inf")
         initial_parameters = get_initial_parameters(run_config)
 
         super().__init__(
@@ -194,6 +201,11 @@ class TrustAwareFedAvg(FedAvg):
 
     def _get_evaluate_fn(self):
         test_loader, num_classes = self.storage_agent.load_global_test_loader()
+        layout = discover_dataset_layout(
+            dataset_root=str(self.run_config["dataset-root"]),
+            test_split=float(self.run_config["test-split"]),
+            seed=int(self.run_config["random-seed"]),
+        )
         model = build_model(
             num_classes=num_classes,
             use_pretrained=coerce_bool(self.run_config["use-pretrained"]),
@@ -220,9 +232,52 @@ class TrustAwareFedAvg(FedAvg):
                 loss=float(metrics["loss"]),
                 metrics=scalar_metrics,
             )
+            self._save_checkpoint(
+                model=model,
+                round_number=server_round,
+                metrics=scalar_metrics,
+                loss=float(metrics["loss"]),
+                classes=layout.classes,
+            )
             return float(metrics["loss"]), scalar_metrics
 
         return evaluate_fn
+
+    def _save_checkpoint(
+        self,
+        model,
+        round_number: int,
+        metrics: dict[str, float],
+        loss: float,
+        classes: list[str],
+    ) -> None:
+        payload = {
+            "round": round_number,
+            "loss": loss,
+            "metrics": metrics,
+            "classes": classes,
+            "model_name": "efficientnet_b0",
+            "use_pretrained": coerce_bool(self.run_config["use-pretrained"]),
+            "dataset_root": str(self.run_config["dataset-root"]),
+            "state_dict": model.state_dict(),
+        }
+        torch.save(payload, self.latest_checkpoint_path)
+
+        current_f1 = float(metrics.get("f1_macro", 0.0))
+        if current_f1 >= self.best_f1_macro:
+            self.best_f1_macro = current_f1
+            torch.save(payload, self.best_checkpoint_path)
+            log(
+                INFO,
+                (
+                    "[ServerCoordinator | round=%s] saved best checkpoint to %s "
+                    "(f1_macro=%.4f, accuracy=%.4f)"
+                ),
+                round_number,
+                self.best_checkpoint_path,
+                current_f1,
+                float(metrics.get("accuracy", 0.0)),
+            )
 
 
 def get_initial_parameters(run_config: dict[str, Any]) -> Parameters:
