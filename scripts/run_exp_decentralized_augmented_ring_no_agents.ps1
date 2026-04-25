@@ -1,0 +1,12 @@
+& "$PSScriptRoot\run_decentralized_baseline_experiment.ps1" `
+    -ExperimentName "decentralized_baseline/exp_decentralized_augmented_ring_no_agents" `
+    -DatasetRoot "brain_tumor_mri" `
+    -PartitionMode "shards_quantity_skew" `
+    -TopologyMode "augmented_ring" `
+    -TopologyExtraOffset 2 `
+    -UsePretrained $false `
+    -LocalEpochs 2 `
+    -BatchSize 16 `
+    -LearningRate 0.0002 `
+    -WeightDecay 0.00001 `
+    -NumServerRounds 30
