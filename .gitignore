@@ -8,4 +8,5 @@ __pycache__/
 .ray-tmp/
 .kaggle/
 brain_tumor_mri/
+data/
 outputs/

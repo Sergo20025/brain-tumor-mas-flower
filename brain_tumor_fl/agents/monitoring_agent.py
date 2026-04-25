@@ -26,9 +26,14 @@ class MonitoringAgent:
         if baseline_norm > 0 and update_norm > 2.5 * baseline_norm:
             anomaly_penalty = 0.5
 
-        time_penalty = 1.0 / (1.0 + np.log1p(max(train_time, 0.0)))
+        # Keep the time penalty intentionally soft: large clients should not be
+        # heavily down-weighted simply because non-IID partitioning gave them
+        # more samples or harder data.
+        time_penalty = 1.0 / (1.0 + 0.15 * np.log1p(max(train_time, 0.0)))
         quality_score = 0.5 * val_accuracy + 0.5 * val_f1
-        trust = float(np.clip(0.2 + 1.4 * quality_score * time_penalty * anomaly_penalty, 0.1, 1.5))
+        trust = float(
+            np.clip(0.55 + 0.55 * quality_score * time_penalty * anomaly_penalty, 0.4, 1.25)
+        )
 
         self.client_trust[client_id] = trust
         self.update_norm_history.append(update_norm)

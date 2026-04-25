@@ -1,0 +1,11 @@
+& "$PSScriptRoot\run_flwr_experiment.ps1" `
+    -ExperimentName "exp_02_fedavg_alpha_05" `
+    -PartitionMode "dirichlet" `
+    -DirichletAlpha 0.5 `
+    -DecentralizedMode $true `
+    -TopologyMode "full_graph" `
+    -TopologyExtraOffset 5 `
+    -UsePretrained $false `
+    -LocalEpochs 2 `
+    -NumServerRounds 30 `
+    -ResetRuntime

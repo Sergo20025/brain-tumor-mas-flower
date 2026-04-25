@@ -67,6 +67,7 @@ def train_model(
     learning_rate: float,
     weight_decay: float,
     device: torch.device,
+    proximal_mu: float = 0.0,
 ) -> dict[str, Any]:
     model.to(device)
     criterion = nn.CrossEntropyLoss()
@@ -75,6 +76,11 @@ def train_model(
     )
 
     initial_parameters = [param.detach().cpu().clone() for param in model.parameters()]
+    proximal_references = None
+    if proximal_mu > 0.0:
+        proximal_references = [
+            param.detach().clone().to(device) for param in model.parameters()
+        ]
 
     start_time = time.perf_counter()
     model.train()
@@ -91,6 +97,13 @@ def train_model(
             optimizer.zero_grad(set_to_none=True)
             logits = model(images)
             loss = criterion(logits, labels)
+            if proximal_references is not None:
+                proximal_term = torch.zeros(1, device=device)
+                for current, reference in zip(
+                    model.parameters(), proximal_references, strict=True
+                ):
+                    proximal_term += torch.sum((current - reference) ** 2)
+                loss = loss + 0.5 * float(proximal_mu) * proximal_term
             loss.backward()
             optimizer.step()
 

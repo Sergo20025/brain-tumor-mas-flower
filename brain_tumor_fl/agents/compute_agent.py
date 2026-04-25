@@ -65,6 +65,7 @@ class ComputeAgent:
             learning_rate=float(fit_config["learning_rate"]),
             weight_decay=float(fit_config["weight_decay"]),
             device=self.device,
+            proximal_mu=float(fit_config.get("proximal_mu", 0.0)),
         )
 
         metrics = {

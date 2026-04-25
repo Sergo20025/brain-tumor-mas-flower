@@ -1,0 +1,11 @@
+& "$PSScriptRoot\run_server_experiment.ps1" `
+    -ExperimentName "cifar100/server/exp_cifar100_fedprox" `
+    -DatasetRoot "cifar100" `
+    -StrategyName "fedprox" `
+    -ProximalMu 0.01 `
+    -PartitionMode "shards_quantity_skew" `
+    -DirichletAlpha 0.5 `
+    -UsePretrained $false `
+    -LocalEpochs 1 `
+    -BatchSize 32 `
+    -NumServerRounds 10

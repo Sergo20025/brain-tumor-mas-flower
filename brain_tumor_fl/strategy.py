@@ -6,7 +6,15 @@ from pathlib import Path
 from typing import Any
 
 import torch
-from flwr.common import NDArrays, Parameters, Scalar, ndarrays_to_parameters, parameters_to_ndarrays
+from flwr.common import (
+    NDArrays,
+    EvaluateIns,
+    FitIns,
+    Parameters,
+    Scalar,
+    ndarrays_to_parameters,
+    parameters_to_ndarrays,
+)
 from flwr.common.logger import log
 from flwr.server.strategy import FedAvg
 
@@ -41,6 +49,10 @@ def _coerce_to_ndarrays(parameters: NDArrays | Parameters) -> NDArrays:
     return parameters_to_ndarrays(parameters)
 
 
+def _clone_ndarrays(parameters: NDArrays) -> NDArrays:
+    return [layer.copy() for layer in parameters]
+
+
 class TrustAwareFedAvg(FedAvg):
     def __init__(
         self,
@@ -62,6 +74,14 @@ class TrustAwareFedAvg(FedAvg):
         self.latest_checkpoint_path = self.checkpoints_dir / "latest_model.pt"
         self.best_f1_macro = float("-inf")
         initial_parameters = get_initial_parameters(run_config)
+        self.initial_ndarrays = _coerce_to_ndarrays(initial_parameters)
+        self.client_partition_map: dict[str, int] = {}
+        self.partition_client_map: dict[int, str] = {}
+        self.client_num_examples: dict[str, int] = {}
+        self.client_local_parameters: dict[str, NDArrays] = {}
+        self.client_dispatch_parameters: dict[str, NDArrays] = {}
+        self.ring_neighbors: dict[str, list[str]] = {}
+        self.ring_ready = False
 
         super().__init__(
             fraction_fit=float(run_config["fraction-fit"]),
@@ -76,8 +96,6 @@ class TrustAwareFedAvg(FedAvg):
         )
 
     def configure_fit(self, server_round, parameters, client_manager):
-        from flwr.common import FitIns
-
         fit_cfg = []
         sample_size, min_num_clients = self.num_fit_clients(client_manager.num_available())
         clients = client_manager.sample(
@@ -89,48 +107,77 @@ class TrustAwareFedAvg(FedAvg):
         base_epochs = int(self.run_config["local-epochs"])
 
         for client in clients:
-            trust = float(self.monitoring_agent.client_trust.get(client.cid, 1.0))
-            local_epochs = max(1, base_epochs - 1) if trust < 0.45 else base_epochs
+            fit_parameters = parameters
+            neighbor_info = ""
+            if self.aggregation_agent.decentralized_mode and self.ring_ready:
+                local_parameters = self.client_dispatch_parameters.get(client.cid)
+                if local_parameters is not None:
+                    fit_parameters = ndarrays_to_parameters(_clone_ndarrays(local_parameters))
+                neighbor_info = self._format_neighbor_info(client.cid)
+
             config = {
                 "server_round": server_round,
                 "learning_rate": base_lr,
-                "local_epochs": local_epochs,
+                "local_epochs": base_epochs,
                 "weight_decay": float(self.run_config["weight-decay"]),
             }
-            fit_cfg.append((client, FitIns(parameters, config)))
+            fit_cfg.append((client, FitIns(fit_parameters, config)))
             log(
                 INFO,
-                "[ServerCoordinator | round=%s] assign client=%s, trust=%.3f, epochs=%s, lr=%.6f",
+                "[ServerCoordinator | round=%s] assign client=%s, epochs=%s, lr=%.6f%s",
                 server_round,
                 client.cid,
-                trust,
-                local_epochs,
+                base_epochs,
                 base_lr,
+                neighbor_info,
             )
         return fit_cfg
+
+    def configure_evaluate(self, server_round, parameters, client_manager):
+        if self.fraction_evaluate == 0.0:
+            return []
+
+        sample_size, min_num_clients = self.num_evaluation_clients(client_manager.num_available())
+        clients = client_manager.sample(
+            num_clients=sample_size,
+            min_num_clients=min_num_clients,
+        )
+
+        evaluate_cfg = []
+        for client in clients:
+            eval_parameters = parameters
+            if self.aggregation_agent.decentralized_mode and self.ring_ready:
+                local_parameters = self.client_dispatch_parameters.get(client.cid)
+                if local_parameters is not None:
+                    eval_parameters = ndarrays_to_parameters(_clone_ndarrays(local_parameters))
+            evaluate_cfg.append((client, EvaluateIns(eval_parameters, {})))
+        return evaluate_cfg
 
     def aggregate_fit(self, server_round, results, failures):
         if not results or (failures and not self.accept_failures):
             return None, {}
 
-        weighted_updates: list[tuple[NDArrays, float]] = []
         round_reports: list[dict[str, Any]] = []
         metrics_with_examples: list[tuple[int, dict[str, Scalar]]] = []
-        client_weights: list[tuple[str, float]] = []
+        global_weighted_updates: list[tuple[NDArrays, float]] = []
 
         for client_proxy, fit_res in results:
             ndarrays = parameters_to_ndarrays(fit_res.parameters)
             metrics = dict(fit_res.metrics)
             num_examples = int(fit_res.num_examples)
+            partition_id = int(metrics.get("partition_id", len(self.client_partition_map)))
             trust = self.monitoring_agent.score_client(client_proxy.cid, metrics)
-            weight = self.aggregation_agent.compute_weight(num_examples=num_examples, trust_score=trust)
-            client_weights.append((client_proxy.cid, weight))
 
-            weighted_updates.append((ndarrays, weight))
+            self.client_partition_map[client_proxy.cid] = partition_id
+            self.partition_client_map[partition_id] = client_proxy.cid
+            self.client_num_examples[client_proxy.cid] = num_examples
+            self.client_local_parameters[client_proxy.cid] = _clone_ndarrays(ndarrays)
+
             metrics_with_examples.append((num_examples, fit_res.metrics))
             round_reports.append(
                 {
                     "client_id": client_proxy.cid,
+                    "partition_id": partition_id,
                     "num_examples": num_examples,
                     "trust_score": trust,
                     **metrics,
@@ -148,21 +195,42 @@ class TrustAwareFedAvg(FedAvg):
                 float(metrics.get("train_accuracy", 0.0)),
                 float(metrics.get("val_accuracy", 0.0)),
                 trust,
-                weight,
+                float(num_examples),
             )
 
-        aggregated_ndarrays = self.aggregation_agent.aggregate(weighted_updates)
+        if self.aggregation_agent.decentralized_mode:
+            if not self.ring_ready:
+                self._initialize_augmented_ring_topology()
+            self.client_dispatch_parameters = self._compute_ring_dispatch_parameters()
+            for client_id, local_params in self.client_dispatch_parameters.items():
+                global_weighted_updates.append(
+                    (local_params, float(max(self.client_num_examples.get(client_id, 1), 1)))
+                )
+            aggregated_ndarrays = self.aggregation_agent.aggregate(global_weighted_updates)
+            self._log_ring_round_summary(server_round)
+        else:
+            for client_id, local_params in self.client_local_parameters.items():
+                global_weighted_updates.append(
+                    (local_params, float(max(self.client_num_examples.get(client_id, 1), 1)))
+                )
+            aggregated_ndarrays = self.aggregation_agent.aggregate(global_weighted_updates)
+
         aggregated_parameters = ndarrays_to_parameters(aggregated_ndarrays)
         aggregated_metrics = _weighted_average_metrics(metrics_with_examples)
         aggregated_metrics["participating_clients"] = len(results)
-        total_weight = sum(weight for _, weight in client_weights)
-        top_clients = sorted(client_weights, key=lambda item: item[1], reverse=True)[:3]
-        self.aggregation_agent.log_round_summary(
-            server_round=server_round,
-            num_clients=len(results),
-            total_weight=total_weight,
-            top_clients=top_clients,
-        )
+        if not self.aggregation_agent.decentralized_mode:
+            client_weights = [
+                (client_id, float(max(self.client_num_examples.get(client_id, 1), 1)))
+                for client_id in self.client_local_parameters
+            ]
+            total_weight = sum(weight for _, weight in client_weights)
+            top_clients = sorted(client_weights, key=lambda item: item[1], reverse=True)[:3]
+            self.aggregation_agent.log_round_summary(
+                server_round=server_round,
+                num_clients=len(results),
+                total_weight=total_weight,
+                top_clients=top_clients,
+            )
 
         self._write_round_report(
             server_round=server_round,
@@ -184,6 +252,96 @@ class TrustAwareFedAvg(FedAvg):
         }
         with self.metrics_path.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(payload, ensure_ascii=True) + "\n")
+
+    def _initialize_augmented_ring_topology(self) -> None:
+        ordered_pairs = sorted(self.partition_client_map.items(), key=lambda item: item[0])
+        ordered_clients = [client_id for _, client_id in ordered_pairs]
+        num_clients = len(ordered_clients)
+        if num_clients == 0:
+            return
+
+        default_offset = max(2, num_clients // 2)
+        extra_offset = int(self.run_config.get("topology-extra-offset", default_offset))
+        self.ring_neighbors = {}
+
+        for idx, client_id in enumerate(ordered_clients):
+            candidate_indices = [
+                (idx - 1) % num_clients,
+                (idx + 1) % num_clients,
+                (idx + extra_offset) % num_clients,
+            ]
+            neighbor_ids: list[str] = []
+            for neighbor_idx in candidate_indices:
+                neighbor_id = ordered_clients[neighbor_idx]
+                if neighbor_id != client_id and neighbor_id not in neighbor_ids:
+                    neighbor_ids.append(neighbor_id)
+
+            if len(neighbor_ids) < 3:
+                for shift in range(2, num_clients):
+                    neighbor_id = ordered_clients[(idx + shift) % num_clients]
+                    if neighbor_id != client_id and neighbor_id not in neighbor_ids:
+                        neighbor_ids.append(neighbor_id)
+                    if len(neighbor_ids) == 3:
+                        break
+
+            self.ring_neighbors[client_id] = neighbor_ids[:3]
+
+        self.ring_ready = True
+
+        log(
+            INFO,
+            (
+                "[TopologyCoordinator] initialized augmented ring topology with %s nodes "
+                "(extra_offset=%s)"
+            ),
+            num_clients,
+            extra_offset,
+        )
+        for partition_id, client_id in ordered_pairs:
+            neighbors = self.ring_neighbors.get(client_id, [])
+            neighbor_partitions = [
+                str(self.client_partition_map.get(neighbor_id, "?")) for neighbor_id in neighbors
+            ]
+            log(
+                INFO,
+                "[TopologyCoordinator] node=%s neighbors=%s",
+                partition_id,
+                ", ".join(neighbor_partitions),
+            )
+
+    def _compute_ring_dispatch_parameters(self) -> dict[str, NDArrays]:
+        dispatch_parameters: dict[str, NDArrays] = {}
+        for client_id, local_parameters in self.client_local_parameters.items():
+            neighborhood_updates: list[tuple[NDArrays, float]] = [(_clone_ndarrays(local_parameters), 1.0)]
+            for neighbor_id in self.ring_neighbors.get(client_id, []):
+                neighbor_parameters = self.client_local_parameters.get(neighbor_id)
+                if neighbor_parameters is not None:
+                    neighborhood_updates.append((_clone_ndarrays(neighbor_parameters), 1.0))
+            dispatch_parameters[client_id] = self.aggregation_agent.aggregate(neighborhood_updates)
+        return dispatch_parameters
+
+    def _format_neighbor_info(self, client_id: str) -> str:
+        neighbors = self.ring_neighbors.get(client_id, [])
+        if not neighbors:
+            return ""
+        labels = [str(self.client_partition_map.get(neighbor_id, "?")) for neighbor_id in neighbors]
+        return f", neighbors=[{', '.join(labels)}]"
+
+    def _log_ring_round_summary(self, server_round: int) -> None:
+        topologies = []
+        for client_id, neighbors in sorted(
+            self.ring_neighbors.items(),
+            key=lambda item: self.client_partition_map.get(item[0], -1),
+        ):
+            partition_id = self.client_partition_map.get(client_id, -1)
+            neighbor_labels = [str(self.client_partition_map.get(neighbor_id, "?")) for neighbor_id in neighbors]
+            topologies.append(f"{partition_id}->[{', '.join(neighbor_labels)}]")
+        log(
+            INFO,
+            "[AggregationAgent | round=%s] augmented ring neighbor aggregation: %s",
+            server_round,
+            "; ".join(topologies),
+        )
 
     def _write_global_eval_report(
         self,
