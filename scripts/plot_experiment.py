@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -205,6 +206,8 @@ def build_partition_tables(
     partition_mode: str,
     alpha: float,
     seed: int,
+    soft_mix_ratio: float = 0.15,
+    soft_min_extra_classes: int = 5,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     layout = discover_dataset_layout(str(dataset_root), test_split=0.15, seed=seed)
     partitions = create_client_partitions(
@@ -212,6 +215,8 @@ def build_partition_tables(
         num_clients=num_clients,
         partition_mode=partition_mode,
         dirichlet_alpha=alpha,
+        soft_mix_ratio=soft_mix_ratio,
+        soft_min_extra_classes=soft_min_extra_classes,
         seed=seed,
     )
 
@@ -266,6 +271,124 @@ def plot_class_distribution(
     plt.close(fig)
 
 
+def plot_class_distribution_faceted(
+    class_df: pd.DataFrame,
+    output_dir: Path,
+    partition_mode: str,
+    alpha: float,
+) -> None:
+    clients = sorted(class_df["client"].unique(), key=lambda label: int(str(label).replace("C", "")))
+    classes = list(dict.fromkeys(class_df["class_name"].tolist()))
+    num_clients = len(clients)
+    num_cols = 2 if num_clients > 1 else 1
+    num_rows = math.ceil(num_clients / num_cols)
+
+    fig, axes = plt.subplots(
+        num_rows,
+        num_cols,
+        figsize=(14, max(3.5 * num_rows, 4.5)),
+        sharex=True,
+        sharey=True,
+    )
+    if not isinstance(axes, (list, tuple)):
+        axes = [axes] if not hasattr(axes, "flatten") else list(axes.flatten())
+    else:
+        axes = list(axes)
+    if hasattr(axes[0], "flatten"):
+        axes = list(axes[0].flatten())
+
+    max_count = float(class_df["count"].max()) if not class_df.empty else 1.0
+    for ax, client in zip(axes, clients, strict=False):
+        subset = class_df[class_df["client"] == client].copy()
+        subset["class_name"] = pd.Categorical(subset["class_name"], categories=classes, ordered=True)
+        subset = subset.sort_values("class_name")
+        sns.barplot(data=subset, x="class_name", y="count", color="#4C78A8", ax=ax)
+        ax.set_title(f"Client {client.replace('C', '')}")
+        ax.set_xlabel("Class")
+        ax.set_ylabel("Samples")
+        ax.set_ylim(0, max_count * 1.05)
+        ax.grid(True, axis="y", alpha=0.25)
+        if len(classes) > 20:
+            ax.set_xticks([])
+            ax.set_xlabel("Class")
+        else:
+            ax.tick_params(axis="x", rotation=45)
+
+    for ax in axes[num_clients:]:
+        ax.axis("off")
+
+    if partition_mode == "dirichlet":
+        title = f"Client-wise Class Distribution ({partition_mode}, alpha={alpha})"
+        filename = f"class_distribution_faceted_{partition_mode}_alpha_{str(alpha).replace('.', '_')}.png"
+    else:
+        title = f"Client-wise Class Distribution ({partition_mode})"
+        filename = f"class_distribution_faceted_{partition_mode}.png"
+    fig.suptitle(title, fontsize=15)
+    fig.tight_layout(rect=[0, 0, 1, 0.97])
+    fig.savefig(output_dir / filename, dpi=200)
+    plt.close(fig)
+
+
+def plot_class_coverage_by_client(
+    class_df: pd.DataFrame,
+    output_dir: Path,
+    partition_mode: str,
+) -> None:
+    coverage_df = (
+        class_df.assign(non_zero=lambda df: (df["count"] > 0).astype(int))
+        .groupby("client", as_index=False)["non_zero"]
+        .sum()
+        .rename(columns={"non_zero": "num_present_classes"})
+    )
+    fig, ax = plt.subplots(figsize=(10, 6))
+    sns.barplot(data=coverage_df, x="client", y="num_present_classes", color="#72B7B2", ax=ax)
+    ax.set_title(f"Number of Present Classes by Client ({partition_mode})")
+    ax.set_xlabel("Client")
+    ax.set_ylabel("Classes with Non-Zero Samples")
+    ax.grid(True, axis="y", alpha=0.3)
+    fig.tight_layout()
+    fig.savefig(output_dir / f"class_coverage_{partition_mode}.png", dpi=200)
+    plt.close(fig)
+
+
+def plot_async_participation(round_df: pd.DataFrame, output_dir: Path) -> None:
+    if "participating_clients" not in round_df.columns:
+        return
+    fig, ax = plt.subplots(figsize=(10, 6))
+    sns.lineplot(data=round_df, x="round", y="participating_clients", marker="o", label="Active Clients", ax=ax)
+    if "skipped_clients" in round_df.columns:
+        sns.lineplot(data=round_df, x="round", y="skipped_clients", marker="o", label="Skipped Clients", ax=ax)
+    ax.set_title("Async Participation Across Federated Rounds")
+    ax.set_xlabel("Round")
+    ax.set_ylabel("Number of Clients")
+    ax.grid(True, alpha=0.3)
+    fig.tight_layout()
+    fig.savefig(output_dir / "async_participation_dynamics.png", dpi=200)
+    plt.close(fig)
+
+
+def plot_train_time_by_client(client_df: pd.DataFrame, output_dir: Path) -> None:
+    if "train_time_sec" not in client_df.columns:
+        return
+    fig, ax = plt.subplots(figsize=(12, 7))
+    sns.lineplot(
+        data=client_df,
+        x="round",
+        y="train_time_sec",
+        hue="client_label",
+        marker="o",
+        ax=ax,
+    )
+    ax.set_title("Local Training Time by Client Across Federated Rounds")
+    ax.set_xlabel("Round")
+    ax.set_ylabel("Train Time (sec)")
+    ax.grid(True, alpha=0.3)
+    ax.legend(title="Client", bbox_to_anchor=(1.02, 1), loc="upper left")
+    fig.tight_layout()
+    fig.savefig(output_dir / "train_time_by_client.png", dpi=200)
+    plt.close(fig)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--experiment-dir", default=None)
@@ -275,6 +398,8 @@ def main() -> None:
     parser.add_argument("--num-clients", type=int, default=10)
     parser.add_argument("--partition-mode", default="dirichlet")
     parser.add_argument("--alpha", type=float, default=0.5)
+    parser.add_argument("--soft-mix-ratio", type=float, default=0.15)
+    parser.add_argument("--soft-min-extra-classes", type=int, default=5)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--output-dir", default="outputs/plots")
     args = parser.parse_args()
@@ -304,6 +429,9 @@ def main() -> None:
         plot_trust_score_by_client(client_df, output_dir)
     if not client_df.empty and "update_l2_norm" in client_df.columns:
         plot_update_l2_norm_by_client(client_df, output_dir)
+    if not client_df.empty and "train_time_sec" in client_df.columns:
+        plot_train_time_by_client(client_df, output_dir)
+    plot_async_participation(round_df, output_dir)
 
     if args.partition_mode != "local" and args.num_clients > 1:
         volume_df, class_df = build_partition_tables(
@@ -312,9 +440,13 @@ def main() -> None:
             partition_mode=args.partition_mode,
             alpha=args.alpha,
             seed=args.seed,
+            soft_mix_ratio=args.soft_mix_ratio,
+            soft_min_extra_classes=args.soft_min_extra_classes,
         )
         plot_data_volume_distribution(volume_df, output_dir, args.partition_mode)
         plot_class_distribution(class_df, output_dir, args.partition_mode, args.alpha)
+        plot_class_distribution_faceted(class_df, output_dir, args.partition_mode, args.alpha)
+        plot_class_coverage_by_client(class_df, output_dir, args.partition_mode)
 
     print("Saved plots to:", output_dir)
 

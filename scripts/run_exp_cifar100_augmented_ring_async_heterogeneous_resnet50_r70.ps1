@@ -1,0 +1,17 @@
+& "$PSScriptRoot\run_decentralized_experiment.ps1" `
+    -ExperimentName "cifar100/decentralized/exp_cifar100_augmented_ring_async_heterogeneous_resnet50_r70" `
+    -DatasetRoot "cifar100" `
+    -PartitionMode "shards_quantity_skew" `
+    -ModelName "resnet50" `
+    -TopologyMode "augmented_ring" `
+    -TopologyExtraOffset 2 `
+    -UsePretrained $false `
+    -LocalEpochs 2 `
+    -BatchSize 32 `
+    -LearningRate 0.0005 `
+    -WeightDecay 0.0001 `
+    -NumServerRounds 70 `
+    -AsyncMode $true `
+    -AsyncDropoutRate 0.2 `
+    -MaxAsyncDropouts 2 `
+    -HeterogeneousNodes $true

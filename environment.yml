@@ -17,3 +17,6 @@ dependencies:
       - kaggle>=2.0
       - flwr>=1.29,<2.0
       - ray>=2.54,<3.0
+      - sqlalchemy>=2.0.36
+      - psycopg[binary]>=3.2.3
+      - python-dotenv>=1.0.1

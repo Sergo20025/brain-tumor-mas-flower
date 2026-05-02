@@ -1,0 +1,16 @@
+& "$PSScriptRoot\run_decentralized_experiment.ps1" `
+    -ExperimentName "decentralized/exp_decentralized_augmented_ring_async_heterogeneous" `
+    -DatasetRoot "brain_tumor_mri" `
+    -PartitionMode "shards_quantity_skew" `
+    -TopologyMode "augmented_ring" `
+    -TopologyExtraOffset 2 `
+    -UsePretrained $false `
+    -LocalEpochs 2 `
+    -BatchSize 16 `
+    -LearningRate 0.0002 `
+    -WeightDecay 0.00001 `
+    -NumServerRounds 50 `
+    -AsyncMode $true `
+    -AsyncDropoutRate 0.2 `
+    -MaxAsyncDropouts 2 `
+    -HeterogeneousNodes $true

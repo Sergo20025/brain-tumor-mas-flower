@@ -6,13 +6,21 @@ param(
     [string]$DatasetRoot = "brain_tumor_mri",
     [string]$PartitionMode = "shards_quantity_skew",
     [double]$DirichletAlpha = 0.5,
+    [double]$SoftMixRatio = 0.15,
+    [int]$SoftMinExtraClasses = 5,
+    [string]$ModelName = "efficientnet_b0",
     [string]$TopologyMode = "augmented_ring",
     [int]$TopologyExtraOffset = 2,
     [bool]$UsePretrained = $false,
     [int]$LocalEpochs = 2,
     [int]$BatchSize = 16,
     [double]$LearningRate = 0.0002,
-    [double]$WeightDecay = 0.00001
+    [double]$WeightDecay = 0.00001,
+    [bool]$AsyncMode = $false,
+    [double]$AsyncDropoutRate = 0.0,
+    [int]$MaxAsyncDropouts = 0,
+    [bool]$HeterogeneousNodes = $false,
+    [string]$ResumeCheckpoint = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -30,6 +38,9 @@ $args = @(
     "--num-clients", "$NumClients",
     "--partition-mode", $PartitionMode,
     "--dirichlet-alpha", "$DirichletAlpha",
+    "--soft-mix-ratio", "$SoftMixRatio",
+    "--soft-min-extra-classes", "$SoftMinExtraClasses",
+    "--model-name", $ModelName,
     "--decentralized-mode", "true",
     "--topology-mode", $TopologyMode,
     "--topology-extra-offset", "$TopologyExtraOffset",
@@ -38,10 +49,18 @@ $args = @(
     "--batch-size", "$BatchSize",
     "--learning-rate", "$LearningRate",
     "--weight-decay", "$WeightDecay",
+    "--async-mode", $($AsyncMode.ToString().ToLower()),
+    "--async-dropout-rate", "$AsyncDropoutRate",
+    "--max-async-dropouts", "$MaxAsyncDropouts",
+    "--heterogeneous-nodes", $($HeterogeneousNodes.ToString().ToLower()),
     "--save-metrics-path", $saveMetricsPath
 )
 
+if (-not [string]::IsNullOrWhiteSpace($ResumeCheckpoint)) {
+    $args += @("--resume-checkpoint", $ResumeCheckpoint)
+}
+
 Write-Host "Running decentralized simulation: $ExperimentName [$TopologyMode]" -ForegroundColor Cyan
 python @args
-python scripts\plot_experiment.py --experiment-dir "outputs/experiments/$ExperimentName" --dataset-root $DatasetRoot --num-clients "$NumClients" --partition-mode $PartitionMode --alpha "$DirichletAlpha"
+python scripts\plot_experiment.py --experiment-dir "outputs/experiments/$ExperimentName" --dataset-root $DatasetRoot --num-clients "$NumClients" --partition-mode $PartitionMode --alpha "$DirichletAlpha" --soft-mix-ratio "$SoftMixRatio" --soft-min-extra-classes "$SoftMinExtraClasses"
 python scripts\analyze_experiment.py --experiment-dir "outputs/experiments/$ExperimentName" --partition-mode $PartitionMode

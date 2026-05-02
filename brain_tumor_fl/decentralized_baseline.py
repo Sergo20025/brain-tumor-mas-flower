@@ -15,6 +15,7 @@ from brain_tumor_fl.data import (
     prepare_client_partition,
     prepare_global_test_loader,
 )
+from brain_tumor_fl.db import ExperimentDatabaseRecorder
 from brain_tumor_fl.model import build_model
 from brain_tumor_fl.training import evaluate_model, get_device, get_parameters, set_parameters, train_model
 from brain_tumor_fl.utils import coerce_bool
@@ -152,6 +153,10 @@ class DecentralizedBaselineCoordinator:
         self.best_f1_macro = float("-inf")
         self.train_history: list[dict[str, float]] = []
         self.eval_history: list[dict[str, float]] = []
+        self.db_recorder = ExperimentDatabaseRecorder(
+            run_config={**run_config, "model-name": "efficientnet_b0"},
+            mode="decentralized_baseline",
+        )
 
         self.global_test_loader, self.num_classes = prepare_global_test_loader(
             dataset_root=str(run_config["dataset-root"]),
@@ -196,6 +201,8 @@ class DecentralizedBaselineCoordinator:
                 num_clients=int(self.run_config["num-clients"]),
                 partition_mode=str(self.run_config["partition-mode"]),
                 dirichlet_alpha=float(self.run_config["dirichlet-alpha"]),
+                soft_mix_ratio=float(self.run_config.get("soft-mix-ratio", 0.15)),
+                soft_min_extra_classes=int(self.run_config.get("soft-min-extra-classes", 5)),
                 batch_size=int(self.run_config["batch-size"]),
                 val_split=float(self.run_config["val-split"]),
                 test_split=float(self.run_config["test-split"]),
@@ -340,6 +347,11 @@ class DecentralizedBaselineCoordinator:
         }
         with self.global_metrics_path.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(payload, ensure_ascii=True) + "\n")
+        self.db_recorder.record_global_eval(
+            round_number=round_number,
+            loss=float(metrics["loss"]),
+            metrics=payload,
+        )
         self.eval_history.append(
             {
                 "round": round_number,
@@ -448,6 +460,34 @@ class DecentralizedBaselineCoordinator:
         }
         with self.metrics_path.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(payload, ensure_ascii=True) + "\n")
+        self.db_recorder.record_round(
+            round_number=round_number,
+            aggregated_metrics=dict(aggregated_metrics),
+            client_reports=client_reports,
+        )
+
+    def finalize_experiment(self, status: str, error_message: str | None = None) -> None:
+        self.db_recorder.register_artifact(
+            artifact_type="metrics_jsonl",
+            file_path=self.metrics_path,
+            description="Per-round aggregated and client metrics",
+        )
+        self.db_recorder.register_artifact(
+            artifact_type="global_metrics_jsonl",
+            file_path=self.global_metrics_path,
+            description="Global evaluation metrics by round",
+        )
+        self.db_recorder.register_artifact(
+            artifact_type="checkpoint",
+            file_path=self.latest_checkpoint_path,
+            description="Latest global checkpoint",
+        )
+        self.db_recorder.register_artifact(
+            artifact_type="checkpoint",
+            file_path=self.best_checkpoint_path,
+            description="Best checkpoint by f1_macro",
+        )
+        self.db_recorder.finalize(status=status, error_message=error_message)
 
 
 def _parse_args() -> argparse.Namespace:
@@ -459,6 +499,8 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--num-clients", type=int, default=10)
     parser.add_argument("--partition-mode", default="dirichlet")
     parser.add_argument("--dirichlet-alpha", type=float, default=0.5)
+    parser.add_argument("--soft-mix-ratio", type=float, default=0.15)
+    parser.add_argument("--soft-min-extra-classes", type=int, default=5)
     parser.add_argument("--topology-mode", default="augmented_ring")
     parser.add_argument("--topology-extra-offset", type=int, default=2)
     parser.add_argument("--use-pretrained", default="false")
@@ -481,6 +523,8 @@ def _namespace_to_run_config(args: argparse.Namespace) -> dict[str, Any]:
         "num-clients": args.num_clients,
         "partition-mode": args.partition_mode,
         "dirichlet-alpha": args.dirichlet_alpha,
+        "soft-mix-ratio": args.soft_mix_ratio,
+        "soft-min-extra-classes": args.soft_min_extra_classes,
         "topology-mode": args.topology_mode,
         "topology-extra-offset": args.topology_extra_offset,
         "use-pretrained": coerce_bool(args.use_pretrained),
@@ -500,7 +544,22 @@ def main() -> None:
     args = _parse_args()
     run_config = _namespace_to_run_config(args)
     coordinator = DecentralizedBaselineCoordinator(run_config)
-    coordinator.run()
+    try:
+        coordinator.run()
+    except KeyboardInterrupt:
+        coordinator.finalize_experiment(
+            status="interrupted",
+            error_message="Interrupted by user",
+        )
+        raise
+    except Exception as exc:
+        coordinator.finalize_experiment(
+            status="failed",
+            error_message=str(exc),
+        )
+        raise
+    else:
+        coordinator.finalize_experiment(status="completed")
 
 
 if __name__ == "__main__":

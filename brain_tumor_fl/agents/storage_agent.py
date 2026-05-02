@@ -20,6 +20,8 @@ class StorageAgent:
             num_clients=int(self.config["num-clients"]),
             partition_mode=str(self.config["partition-mode"]),
             dirichlet_alpha=float(self.config["dirichlet-alpha"]),
+            soft_mix_ratio=float(self.config.get("soft-mix-ratio", 0.15)),
+            soft_min_extra_classes=int(self.config.get("soft-min-extra-classes", 5)),
             batch_size=int(self.config["batch-size"]),
             val_split=float(self.config["val-split"]),
             test_split=float(self.config["test-split"]),

@@ -104,6 +104,7 @@ def predict_image(
     model = build_model(
         num_classes=len(classes),
         use_pretrained=bool(checkpoint.get("use_pretrained", True)),
+        model_name=str(checkpoint.get("model_name", "efficientnet_b0")),
     )
     model.load_state_dict(checkpoint["state_dict"], strict=True)
     model.to(device)

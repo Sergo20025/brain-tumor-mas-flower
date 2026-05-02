@@ -33,6 +33,7 @@ class ComputeAgent:
         self.model = build_model(
             num_classes=int(bundle["num_classes"]),
             use_pretrained=coerce_bool(self.config["use-pretrained"]),
+            model_name=str(self.config.get("model-name", "efficientnet_b0")),
         )
         print_agent_log(
             "ComputeAgent",
