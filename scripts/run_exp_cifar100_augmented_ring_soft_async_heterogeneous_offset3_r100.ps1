@@ -1,0 +1,20 @@
+& "$PSScriptRoot\run_decentralized_experiment.ps1" `
+    -ExperimentName "cifar100/decentralized/exp_cifar100_augmented_ring_soft_async_heterogeneous_offset3_r100" `
+    -DatasetRoot "cifar100" `
+    -PartitionMode "shards_quantity_skew_soft" `
+    -SoftMixRatio 0.25 `
+    -SoftMinExtraClasses 12 `
+    -NumServerRounds 100 `
+    -NumClients 10 `
+    -TopologyMode "augmented_ring" `
+    -TopologyExtraOffset 3 `
+    -ModelName "efficientnet_b0" `
+    -UsePretrained $false `
+    -LocalEpochs 2 `
+    -BatchSize 32 `
+    -LearningRate 0.0001 `
+    -WeightDecay 0.0001 `
+    -AsyncMode $true `
+    -AsyncDropoutRate 0.10 `
+    -MaxAsyncDropouts 2 `
+    -HeterogeneousNodes $true

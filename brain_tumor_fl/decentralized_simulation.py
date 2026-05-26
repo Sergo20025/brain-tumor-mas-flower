@@ -312,6 +312,14 @@ class DecentralizedCoordinator:
             base_batch_size=int(run_config["batch-size"]),
             heterogeneous_nodes=self.heterogeneous_nodes,
         )
+        self.eval_model = build_model(
+            num_classes=self.num_classes,
+            use_pretrained=coerce_bool(self.run_config["use-pretrained"]),
+            model_name=str(self.run_config.get("model-name", "efficientnet_b0")),
+        )
+        self.eval_device = get_device()
+        self.eval_model.to(self.eval_device)
+        self._load_resume_checkpoint_if_needed()
         self.nodes = self._build_nodes()
         self.async_scheduler = AsyncParticipationScheduler(
             num_nodes=int(run_config["num-clients"]),
@@ -323,14 +331,6 @@ class DecentralizedCoordinator:
                 for node_id, profile in self.resource_profiles.items()
             },
         )
-        self.eval_model = build_model(
-            num_classes=self.num_classes,
-            use_pretrained=coerce_bool(self.run_config["use-pretrained"]),
-            model_name=str(self.run_config.get("model-name", "efficientnet_b0")),
-        )
-        self.eval_device = get_device()
-        self.eval_model.to(self.eval_device)
-        self._load_resume_checkpoint_if_needed()
 
     def _load_resume_checkpoint_if_needed(self) -> None:
         if not self.resume_checkpoint_path:

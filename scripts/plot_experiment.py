@@ -32,7 +32,7 @@ def load_jsonl(path: Path) -> list[dict]:
     if not path.exists():
         raise FileNotFoundError(f"File not found: {path}")
     rows: list[dict] = []
-    with path.open("r", encoding="utf-8") as handle:
+    with path.open("r", encoding="utf-8-sig") as handle:
         for line in handle:
             line = line.strip()
             if line:
@@ -59,7 +59,12 @@ def select_last_run(rows: list[dict]) -> list[dict]:
     if current_run:
         runs.append(current_run)
 
-    return runs[-1]
+    # A training run can be resumed or accidentally restarted after completion.
+    # In that case the final JSONL segment can contain only a short tail
+    # (for example rounds 0-1), while the complete experiment is the longest
+    # monotonic segment. Use the longest segment for plots to avoid replacing
+    # full 1-100 round charts with a partial restart.
+    return max(runs, key=len)
 
 
 def build_round_dataframe(round_metrics_path: Path) -> tuple[pd.DataFrame, pd.DataFrame]:
@@ -389,6 +394,124 @@ def plot_train_time_by_client(client_df: pd.DataFrame, output_dir: Path) -> None
     plt.close(fig)
 
 
+def _filter_active_client_rows(client_df: pd.DataFrame) -> pd.DataFrame:
+    filtered = client_df.copy()
+    if "skipped" in filtered.columns:
+        filtered = filtered[~filtered["skipped"].fillna(False)]
+    if "val_loss" in filtered.columns:
+        filtered = filtered[filtered["val_loss"] > 0]
+    return filtered.reset_index(drop=True)
+
+
+def plot_local_vs_global_loss_dynamics(
+    client_df: pd.DataFrame,
+    global_eval_df: pd.DataFrame,
+    output_dir: Path,
+) -> None:
+    active_df = _filter_active_client_rows(client_df)
+    if active_df.empty or "val_loss" not in active_df.columns:
+        return
+
+    local_loss_df = (
+        active_df.groupby("round", as_index=False)["val_loss"]
+        .mean()
+        .rename(columns={"val_loss": "mean_client_val_loss"})
+    )
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+    sns.lineplot(
+        data=local_loss_df,
+        x="round",
+        y="mean_client_val_loss",
+        marker="o",
+        label="Mean Client Val Loss",
+        ax=ax,
+    )
+    sns.lineplot(
+        data=global_eval_df,
+        x="round",
+        y="loss",
+        marker="o",
+        label="Global Test Loss",
+        ax=ax,
+    )
+    ax.set_title("Local vs Global Loss Dynamics")
+    ax.set_xlabel("Round")
+    ax.set_ylabel("Loss")
+    ax.grid(True, alpha=0.3)
+    fig.tight_layout()
+    fig.savefig(output_dir / "local_vs_global_loss_dynamics.png", dpi=200)
+    plt.close(fig)
+
+
+def plot_mean_update_l2_by_round(client_df: pd.DataFrame, output_dir: Path) -> None:
+    active_df = _filter_active_client_rows(client_df)
+    if active_df.empty or "update_l2_norm" not in active_df.columns:
+        return
+
+    stats_df = (
+        active_df.groupby("round")["update_l2_norm"]
+        .agg(["mean", "std"])
+        .reset_index()
+        .fillna(0.0)
+    )
+    stats_df["lower"] = (stats_df["mean"] - stats_df["std"]).clip(lower=0.0)
+    stats_df["upper"] = stats_df["mean"] + stats_df["std"]
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+    ax.plot(stats_df["round"], stats_df["mean"], marker="o", color="#4C78A8", label="Mean Update L2")
+    ax.fill_between(
+        stats_df["round"],
+        stats_df["lower"],
+        stats_df["upper"],
+        color="#4C78A8",
+        alpha=0.2,
+        label="±1 std",
+    )
+    ax.set_title("Mean Update L2 Norm by Round")
+    ax.set_xlabel("Round")
+    ax.set_ylabel("Update L2 Norm")
+    ax.grid(True, alpha=0.3)
+    ax.legend()
+    fig.tight_layout()
+    fig.savefig(output_dir / "mean_update_l2_by_round.png", dpi=200)
+    plt.close(fig)
+
+
+def plot_client_val_loss_dispersion(client_df: pd.DataFrame, output_dir: Path) -> None:
+    active_df = _filter_active_client_rows(client_df)
+    if active_df.empty or "val_loss" not in active_df.columns:
+        return
+
+    stats_df = (
+        active_df.groupby("round")["val_loss"]
+        .agg(["mean", "std"])
+        .reset_index()
+        .fillna(0.0)
+    )
+    stats_df["lower"] = (stats_df["mean"] - stats_df["std"]).clip(lower=0.0)
+    stats_df["upper"] = stats_df["mean"] + stats_df["std"]
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+    ax.plot(stats_df["round"], stats_df["mean"], marker="o", color="#E07B39", label="Mean Client Val Loss")
+    ax.fill_between(
+        stats_df["round"],
+        stats_df["lower"],
+        stats_df["upper"],
+        color="#E07B39",
+        alpha=0.22,
+        label="±1 std",
+    )
+    ax.set_title("Client Validation Loss Dispersion Across Rounds")
+    ax.set_xlabel("Round")
+    ax.set_ylabel("Validation Loss")
+    ax.grid(True, alpha=0.3)
+    ax.legend()
+    fig.tight_layout()
+    fig.savefig(output_dir / "client_val_loss_dispersion.png", dpi=200)
+    plt.close(fig)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--experiment-dir", default=None)
@@ -431,6 +554,12 @@ def main() -> None:
         plot_update_l2_norm_by_client(client_df, output_dir)
     if not client_df.empty and "train_time_sec" in client_df.columns:
         plot_train_time_by_client(client_df, output_dir)
+    if not client_df.empty and not global_eval_df.empty:
+        plot_local_vs_global_loss_dynamics(client_df, global_eval_df, output_dir)
+    if not client_df.empty and "update_l2_norm" in client_df.columns:
+        plot_mean_update_l2_by_round(client_df, output_dir)
+    if not client_df.empty and "val_loss" in client_df.columns:
+        plot_client_val_loss_dispersion(client_df, output_dir)
     plot_async_participation(round_df, output_dir)
 
     if args.partition_mode != "local" and args.num_clients > 1:

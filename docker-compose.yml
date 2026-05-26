@@ -1,0 +1,9 @@
+services:
+  brain-tumor-demo:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      BRAIN_TUMOR_WEB_USER: admin
+      BRAIN_TUMOR_WEB_PASSWORD: brain2026
+      BRAIN_TUMOR_WEB_SECRET: brain-tumor-demo-secret

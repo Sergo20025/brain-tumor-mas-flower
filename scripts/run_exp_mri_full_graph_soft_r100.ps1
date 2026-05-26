@@ -1,0 +1,18 @@
+& "$PSScriptRoot\run_decentralized_experiment.ps1" `
+    -ExperimentName "decentralized/exp_mri_full_graph_soft_r100" `
+    -DatasetRoot "brain_tumor_mri" `
+    -PartitionMode "shards_quantity_skew_soft" `
+    -SoftMixRatio 0.20 `
+    -SoftMinExtraClasses 2 `
+    -NumServerRounds 100 `
+    -NumClients 10 `
+    -TopologyMode "full_graph" `
+    -TopologyExtraOffset 2 `
+    -ModelName "efficientnet_b0" `
+    -UsePretrained $false `
+    -LocalEpochs 2 `
+    -BatchSize 16 `
+    -LearningRate 0.0002 `
+    -WeightDecay 0.00001 `
+    -AsyncMode $false `
+    -HeterogeneousNodes $false

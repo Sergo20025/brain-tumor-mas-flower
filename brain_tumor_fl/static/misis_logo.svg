@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 430" role="img" aria-labelledby="title">
+  <title id="title">МИСИС Университет</title>
+  <defs>
+    <linearGradient id="cyanBlue" x1="95" y1="70" x2="230" y2="330" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#32ddec"/>
+      <stop offset="0.48" stop-color="#1592ff"/>
+      <stop offset="1" stop-color="#073bff"/>
+    </linearGradient>
+    <linearGradient id="blueCyan" x1="226" y1="75" x2="120" y2="330" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0a3cff"/>
+      <stop offset="0.55" stop-color="#0986ff"/>
+      <stop offset="1" stop-color="#3fe7e8"/>
+    </linearGradient>
+    <radialGradient id="center" cx="40%" cy="35%" r="70%">
+      <stop offset="0" stop-color="#55f1f3"/>
+      <stop offset="0.55" stop-color="#1288ff"/>
+      <stop offset="1" stop-color="#0839d9"/>
+    </radialGradient>
+  </defs>
+
+  <rect width="900" height="430" fill="#fff"/>
+
+  <path d="M221 69 A151 151 0 1 0 221 361 L221 292 A82 82 0 1 1 221 138 Z" fill="url(#cyanBlue)"/>
+  <path d="M221 69 A151 151 0 0 1 221 361 L221 292 A82 82 0 0 0 221 138 Z" fill="url(#blueCyan)"/>
+  <path d="M221 138 A82 82 0 0 1 221 292 L221 232 A22 22 0 0 0 221 198 Z" fill="#fff"/>
+  <path d="M221 138 A82 82 0 0 0 221 292 L221 232 A22 22 0 0 1 221 198 Z" fill="#fff"/>
+  <circle cx="221" cy="215" r="56" fill="url(#center)"/>
+
+  <text x="365" y="200"
+        font-family="Segoe UI, Arial, sans-serif"
+        font-size="86"
+        font-weight="700"
+        letter-spacing="2"
+        fill="#51586b">МИСИС</text>
+  <text x="366" y="285"
+        font-family="Segoe UI, Arial, sans-serif"
+        font-size="56"
+        font-weight="600"
+        letter-spacing="5"
+        fill="#51586b">УНИВЕРСИТЕТ</text>
+</svg>

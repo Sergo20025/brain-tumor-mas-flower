@@ -23,7 +23,7 @@ def _parse_json_stream(text: str) -> list[dict]:
 
 def load_jsonl(path: Path) -> list[dict]:
     rows: list[dict] = []
-    with path.open("r", encoding="utf-8") as handle:
+    with path.open("r", encoding="utf-8-sig") as handle:
         for line in handle:
             line = line.strip()
             if line:

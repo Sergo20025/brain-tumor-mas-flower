@@ -1,0 +1,201 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#0b2a66"/>
+    </marker>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="2" dy="3" stdDeviation="2" flood-color="#000000" flood-opacity="0.18"/>
+    </filter>
+    <style>
+      .title { font: 700 38px Georgia, "Times New Roman", serif; fill: #0b2a66; }
+      .small { font: 20px "Segoe UI", Arial, sans-serif; fill: #0b2a66; }
+      .tiny { font: 17px "Segoe UI", Arial, sans-serif; fill: #0b2a66; }
+      .node-label { font: 700 27px "Segoe UI", Arial, sans-serif; fill: #0b2a66; text-anchor: middle; }
+      .node-icon { font: 23px "Segoe UI Symbol", "Segoe UI", Arial, sans-serif; fill: #0b2a66; text-anchor: middle; }
+      .panel-title { font: 700 26px Georgia, "Times New Roman", serif; fill: #0b2a66; text-anchor: middle; }
+      .panel-text { font: 19px "Segoe UI", Arial, sans-serif; fill: #0b2a66; }
+      .edge { fill: none; stroke: #0b2a66; stroke-width: 3.2; marker-end: url(#arrow); }
+      .edge-extra { fill: none; stroke: #2d65b7; stroke-width: 2.8; opacity: 0.68; marker-end: url(#arrow); }
+      .node-fast { fill: #eef8ff; stroke: #2187d7; stroke-width: 2.2; }
+      .node-medium { fill: #fff5c8; stroke: #e0a500; stroke-width: 2.2; }
+      .node-slow { fill: #f1f1f1; stroke: #9a9a9a; stroke-width: 2.2; }
+      .node-main { fill: #f5fbff; stroke: #0b2a66; stroke-width: 4; }
+    </style>
+  </defs>
+
+  <rect x="7" y="7" width="1586" height="886" rx="8" fill="#ffffff" stroke="#111111" stroke-width="2"/>
+  <text x="615" y="66" text-anchor="middle" class="title">Децентрализованное взаимодействие узлов в топологии augmented_ring</text>
+
+  <g transform="translate(0,0)">
+    <line x1="355" y1="105" x2="425" y2="105" class="edge"/>
+    <text x="446" y="112" class="small">направленная связь передачи параметров</text>
+  </g>
+
+  <!-- Edges are drawn before nodes so arrow lines do not cover labels. -->
+  <g id="ring-edges">
+    <path class="edge" d="M 646 178 Q 690 174 724 199"/>
+    <path class="edge" d="M 714 219 Q 671 224 638 198"/>
+
+    <path class="edge" d="M 765 230 Q 815 260 827 300"/>
+    <path class="edge" d="M 807 314 Q 770 284 742 238"/>
+
+    <path class="edge" d="M 834 354 Q 850 410 835 455"/>
+    <path class="edge" d="M 813 453 Q 796 400 810 352"/>
+
+    <path class="edge" d="M 813 501 Q 792 555 760 584"/>
+    <path class="edge" d="M 737 570 Q 762 523 805 493"/>
+
+    <path class="edge" d="M 724 609 Q 678 641 640 646"/>
+    <path class="edge" d="M 623 625 Q 663 603 711 590"/>
+
+    <path class="edge" d="M 600 646 Q 552 641 514 609"/>
+    <path class="edge" d="M 528 590 Q 574 603 620 625"/>
+
+    <path class="edge" d="M 480 584 Q 431 538 415 501"/>
+    <path class="edge" d="M 435 493 Q 476 523 503 570"/>
+
+    <path class="edge" d="M 405 455 Q 390 400 406 354"/>
+    <path class="edge" d="M 430 352 Q 444 401 427 453"/>
+
+    <path class="edge" d="M 413 300 Q 425 260 475 230"/>
+    <path class="edge" d="M 498 238 Q 470 284 433 314"/>
+
+    <path class="edge" d="M 516 199 Q 550 174 594 178"/>
+    <path class="edge" d="M 602 198 Q 569 224 526 219"/>
+  </g>
+
+  <g id="extra-edges">
+    <path class="edge-extra" d="M 620 208 L 620 612"/>
+    <path class="edge-extra" d="M 620 612 L 620 208"/>
+
+    <path class="edge-extra" d="M 730 236 L 520 570"/>
+    <path class="edge-extra" d="M 520 570 L 730 236"/>
+
+    <path class="edge-extra" d="M 805 330 L 445 465"/>
+    <path class="edge-extra" d="M 445 465 L 805 330"/>
+
+    <path class="edge-extra" d="M 790 465 L 445 330"/>
+    <path class="edge-extra" d="M 445 330 L 790 465"/>
+
+    <path class="edge-extra" d="M 725 585 L 515 225"/>
+    <path class="edge-extra" d="M 515 225 L 725 585"/>
+  </g>
+
+  <g id="nodes">
+    <g transform="translate(620 170)">
+      <circle r="42" class="node-fast" filter="url(#shadow)"/>
+      <text y="-6" class="node-label">N0</text>
+      <text y="26" class="node-icon">▣</text>
+    </g>
+    <g transform="translate(740 210)">
+      <circle r="42" class="node-slow" filter="url(#shadow)"/>
+      <text y="-6" class="node-label">N1</text>
+      <text y="26" class="node-icon">▣</text>
+    </g>
+    <g transform="translate(835 315)">
+      <circle r="42" class="node-medium" filter="url(#shadow)"/>
+      <text y="-6" class="node-label">N2</text>
+      <text y="26" class="node-icon">▣</text>
+    </g>
+    <g transform="translate(830 470)">
+      <circle r="48" class="node-main" filter="url(#shadow)"/>
+      <circle r="57" fill="none" stroke="#0b2a66" stroke-width="3"/>
+      <text y="-6" class="node-label">N3</text>
+      <text y="28" class="node-icon">▣</text>
+    </g>
+    <g transform="translate(745 595)">
+      <circle r="42" class="node-fast" filter="url(#shadow)"/>
+      <text y="-6" class="node-label">N4</text>
+      <text y="26" class="node-icon">▣</text>
+    </g>
+    <g transform="translate(620 650)">
+      <circle r="42" class="node-medium" filter="url(#shadow)"/>
+      <text y="-6" class="node-label">N5</text>
+      <text y="26" class="node-icon">▣</text>
+    </g>
+    <g transform="translate(495 595)">
+      <circle r="42" class="node-medium" filter="url(#shadow)"/>
+      <text y="-6" class="node-label">N6</text>
+      <text y="26" class="node-icon">▣</text>
+    </g>
+    <g transform="translate(410 470)">
+      <circle r="42" class="node-fast" filter="url(#shadow)"/>
+      <text y="-6" class="node-label">N7</text>
+      <text y="26" class="node-icon">▣</text>
+    </g>
+    <g transform="translate(405 315)">
+      <circle r="42" class="node-slow" filter="url(#shadow)"/>
+      <text y="-6" class="node-label">N8</text>
+      <text y="26" class="node-icon">▣</text>
+    </g>
+    <g transform="translate(500 210)">
+      <circle r="42" class="node-medium" filter="url(#shadow)"/>
+      <text y="-6" class="node-label">N9</text>
+      <text y="26" class="node-icon">▣</text>
+    </g>
+  </g>
+
+  <g id="n3-note" filter="url(#shadow)">
+    <rect x="930" y="365" width="210" height="126" rx="8" fill="#ffffff" stroke="#0b2a66" stroke-width="2.5"/>
+    <text x="1035" y="400" text-anchor="middle" class="panel-title" font-size="24">Для узла N3</text>
+    <text x="1035" y="433" text-anchor="middle" class="small">соседи:</text>
+    <text x="1035" y="467" text-anchor="middle" class="small" font-weight="700">N2, N4, N8</text>
+  </g>
+
+  <g id="heterogeneity-panel" filter="url(#shadow)">
+    <rect x="45" y="600" width="285" height="230" rx="8" fill="#ffffff" stroke="#0b2a66" stroke-width="2.5"/>
+    <text x="187" y="635" text-anchor="middle" class="panel-title" font-size="24">Гетерогенность узлов</text>
+    <circle cx="73" cy="675" r="12" class="node-fast"/>
+    <text x="103" y="682" class="panel-text">fast:</text>
+    <text x="190" y="682" class="panel-text">N0, N4, N7</text>
+    <circle cx="73" cy="713" r="12" class="node-medium"/>
+    <text x="103" y="720" class="panel-text">medium:</text>
+    <text x="190" y="720" class="panel-text">N2, N5, N6, N9</text>
+    <circle cx="73" cy="751" r="12" class="node-slow"/>
+    <text x="103" y="758" class="panel-text">slow:</text>
+    <text x="190" y="758" class="panel-text">N1, N3, N8</text>
+    <line x1="62" y1="778" x2="312" y2="778" stroke="#0b2a66" stroke-width="1.5"/>
+    <text x="63" y="806" class="tiny">Профили различаются по</text>
+    <text x="63" y="828" class="tiny">batch_size, задержке и</text>
+    <text x="63" y="850" class="tiny">вычислительной нагрузке.</text>
+  </g>
+
+  <g id="cycle-panel" filter="url(#shadow)">
+    <rect x="1230" y="105" width="295" height="315" rx="9" fill="#ffffff" stroke="#0b2a66" stroke-width="2.5"/>
+    <text x="1377" y="145" text-anchor="middle" class="panel-title">Цикл обучения на узле</text>
+    <circle cx="1275" cy="190" r="21" fill="#0b2a66"/>
+    <text x="1275" y="198" text-anchor="middle" font-family="Segoe UI" font-size="22" font-weight="700" fill="#ffffff">1</text>
+    <text x="1320" y="197" class="panel-text">локальное обучение</text>
+    <line x1="1275" y1="214" x2="1275" y2="244" class="edge"/>
+    <circle cx="1275" cy="275" r="21" fill="#0b2a66"/>
+    <text x="1275" y="283" text-anchor="middle" font-family="Segoe UI" font-size="22" font-weight="700" fill="#ffffff">2</text>
+    <text x="1320" y="282" class="panel-text">расчет trust-score</text>
+    <line x1="1275" y1="299" x2="1275" y2="329" class="edge"/>
+    <circle cx="1275" cy="360" r="21" fill="#0b2a66"/>
+    <text x="1275" y="368" text-anchor="middle" font-family="Segoe UI" font-size="22" font-weight="700" fill="#ffffff">3</text>
+    <text x="1320" y="358" class="panel-text">получение параметров</text>
+    <text x="1320" y="382" class="panel-text">соседей</text>
+  </g>
+
+  <g id="cycle-panel-bottom" filter="url(#shadow)">
+    <rect x="1230" y="420" width="295" height="135" rx="9" fill="#ffffff" stroke="#0b2a66" stroke-width="2.5"/>
+    <circle cx="1275" cy="465" r="21" fill="#0b2a66"/>
+    <text x="1275" y="473" text-anchor="middle" font-family="Segoe UI" font-size="22" font-weight="700" fill="#ffffff">4</text>
+    <text x="1320" y="458" class="panel-text">локальная агрегация</text>
+    <rect x="1250" y="495" width="250" height="42" rx="8" fill="#eef8ff" stroke="#2187d7" stroke-width="2"/>
+    <text x="1375" y="523" text-anchor="middle" class="panel-text" font-weight="700">обновление модели узла</text>
+  </g>
+
+  <g id="storage-panel" filter="url(#shadow)">
+    <rect x="1230" y="620" width="295" height="210" rx="9" fill="#ffffff" stroke="#0b2a66" stroke-width="2.5"/>
+    <text x="1377" y="660" text-anchor="middle" class="panel-title">Хранение результатов</text>
+    <ellipse cx="1295" cy="708" rx="48" ry="18" fill="#eef8ff" stroke="#0b2a66" stroke-width="3"/>
+    <path d="M 1247 708 L 1247 785 Q 1295 820 1343 785 L 1343 708" fill="#eef8ff" stroke="#0b2a66" stroke-width="3"/>
+    <path d="M 1247 744 Q 1295 778 1343 744" fill="none" stroke="#0b2a66" stroke-width="2"/>
+    <path d="M 1247 777 Q 1295 811 1343 777" fill="none" stroke="#0b2a66" stroke-width="2"/>
+    <text x="1385" y="713" class="panel-text">• метрики</text>
+    <text x="1385" y="745" class="panel-text">• checkpoints</text>
+    <text x="1385" y="777" class="panel-text">• графики</text>
+    <text x="1385" y="809" class="panel-text">• артефакты</text>
+  </g>
+</svg>

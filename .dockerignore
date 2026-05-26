@@ -1,0 +1,11 @@
+.git
+.flwr-home
+.ray-tmp
+__pycache__
+*.pyc
+data
+reports
+presentation_assets
+presentation_formulas
+scripts_archive
+outputs/experiments/cifar10
